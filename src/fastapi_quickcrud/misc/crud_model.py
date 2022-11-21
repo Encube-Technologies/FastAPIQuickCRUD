@@ -1,12 +1,9 @@
-from typing import (Optional,
-                    Dict,
-                    List)
+from typing import Optional, Dict, List
 
 from pydantic import BaseModel
 from pydantic.main import ModelMetaclass
 
-from .exceptions import (RequestMissing,
-                         InvalidRequestMethod)
+from .exceptions import RequestMissing, InvalidRequestMethod
 from .type import CrudMethods
 
 
@@ -20,6 +17,7 @@ class RequestResponseModel(BaseModel):
     jsonbRequestFieldModel: Optional[ModelMetaclass]
     arrayRequestFieldModel: Optional[ModelMetaclass]
     foreignListModel: Optional[List[dict]]
+    RequestBodyUrlVariableMapping: Optional[Dict[str, str]]
 
 
 class CRUDModel(BaseModel):
@@ -33,15 +31,24 @@ class CRUDModel(BaseModel):
     UNIQUE_LIST: Optional[List[str]]
 
     def get_available_request_method(self):
-        return [i for i in self.dict(exclude_unset=True, ).keys() if i in ["GET", "POST", "PUT", "PATCH", "DELETE"]]
+        return [
+            i
+            for i in self.dict(
+                exclude_unset=True,
+            ).keys()
+            if i in ["GET", "POST", "PUT", "PATCH", "DELETE"]
+        ]
 
     def get_model_by_request_method(self, request_method):
         available_methods = self.dict()
         if request_method not in available_methods.keys():
-            raise InvalidRequestMethod(f'{request_method} is not an available request method')
+            raise InvalidRequestMethod(
+                f"{request_method} is not an available request method"
+            )
         if not available_methods[request_method]:
             raise RequestMissing(
-                f'{request_method} is not available, '
-                f'make sure the CRUDModel contains this request method')
+                f"{request_method} is not available, "
+                f"make sure the CRUDModel contains this request method"
+            )
         _ = available_methods[request_method]
         return _

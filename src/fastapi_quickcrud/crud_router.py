@@ -1,24 +1,25 @@
 import asyncio
 import inspect
 from functools import partial
-from typing import \
-    Any, \
-    List, \
-    TypeVar, Union, Callable, Optional
+from typing import Any, List, TypeVar, Union, Callable, Optional
 
-from fastapi import \
-    Depends, APIRouter
-from pydantic import \
-    BaseModel
+from fastapi import Depends, APIRouter
+from pydantic import BaseModel
 from sqlalchemy.sql.schema import Table
 
 from . import sqlalchemy_to_pydantic
 from .misc.abstract_execute import SQLALchemyExecuteService
 from .misc.abstract_parser import SQLAlchemyGeneralSQLeResultParse
-from .misc.abstract_query import SQLAlchemyPGSQLQueryService, \
-    SQLAlchemySQLITEQueryService, SQLAlchemyNotSupportQueryService
-from .misc.abstract_route import SQLAlchemySQLLiteRouteSource, SQLAlchemyPGSQLRouteSource, \
-    SQLAlchemyNotSupportRouteSource
+from .misc.abstract_query import (
+    SQLAlchemyPGSQLQueryService,
+    SQLAlchemySQLITEQueryService,
+    SQLAlchemyNotSupportQueryService,
+)
+from .misc.abstract_route import (
+    SQLAlchemySQLLiteRouteSource,
+    SQLAlchemyPGSQLRouteSource,
+    SQLAlchemyNotSupportRouteSource,
+)
 from .misc.crud_model import CRUDModel
 from .misc.memory_sql import async_memory_db, sync_memory_db
 from .misc.type import CrudMethods, SqlType
@@ -30,18 +31,19 @@ OnConflictModelType = TypeVar("OnConflictModelType", bound=BaseModel)
 
 
 def crud_router_builder(
-        *,
-        db_model: Union[Table, 'DeclarativeBaseModel'],
-        db_session: Callable = None,
-        autocommit: bool = True,
-        crud_methods: Optional[List[CrudMethods]] = None,
-        exclude_columns: Optional[List[str]] = None,
-        dependencies: Optional[List[callable]] = None,
-        crud_models: Optional[CRUDModel] = None,
-        async_mode: Optional[bool] = None,
-        foreign_include: Optional[Base] = None,
-        sql_type: Optional[SqlType] = None,
-        **router_kwargs: Any) -> APIRouter:
+    *,
+    db_model: Union[Table, "DeclarativeBaseModel"],
+    db_session: Callable = None,
+    autocommit: bool = True,
+    crud_methods: Optional[List[CrudMethods]] = None,
+    exclude_columns: Optional[List[str]] = None,
+    dependencies: Optional[List[callable]] = None,
+    crud_models: Optional[CRUDModel] = None,
+    async_mode: Optional[bool] = None,
+    foreign_include: Optional[Base] = None,
+    sql_type: Optional[SqlType] = None,
+    **router_kwargs: Any
+) -> APIRouter:
     """
     @param db_model:
         The Sqlalchemy Base model/Table you want to use it to build api.
@@ -108,17 +110,22 @@ def crud_router_builder(
         async_mode = inspect.isasyncgen(db_session())
 
     if sql_type is None:
+
         async def async_runner(f):
             return [i.bind.name async for i in f()]
 
         try:
             if async_mode:
-                sql_type, = asyncio.get_event_loop().run_until_complete(async_runner(db_session))
+                (sql_type,) = asyncio.get_event_loop().run_until_complete(
+                    async_runner(db_session)
+                )
             else:
-                sql_type, = [i.bind.name for i in db_session()]
+                (sql_type,) = [i.bind.name for i in db_session()]
         except Exception:
-            raise RuntimeError("Some unknown problem occurred error, maybe you are uvicorn.run with reload=True. "
-                               "Try declaring sql_type for crud_router_builder yourself using from fastapi_quickcrud.misc.type import SqlType")
+            raise RuntimeError(
+                "Some unknown problem occurred error, maybe you are uvicorn.run with reload=True. "
+                "Try declaring sql_type for crud_router_builder yourself using from fastapi_quickcrud.misc.type import SqlType"
+            )
 
     if not crud_methods and NO_PRIMARY_KEY == False:
         crud_methods = CrudMethods.get_declarative_model_full_crud_method()
@@ -138,30 +145,36 @@ def crud_router_builder(
 
     if not crud_models:
         crud_models_builder: CRUDModel = sqlalchemy_to_pydantic
-        crud_models: CRUDModel = crud_models_builder(db_model=db_model,
-                                                     constraints=constraints,
-                                                     crud_methods=crud_methods,
-                                                     exclude_columns=exclude_columns,
-                                                     sql_type=sql_type,
-                                                     foreign_include=foreign_include,
-                                                     exclude_primary_key=NO_PRIMARY_KEY)
+        crud_models: CRUDModel = crud_models_builder(
+            db_model=db_model,
+            constraints=constraints,
+            crud_methods=crud_methods,
+            exclude_columns=exclude_columns,
+            sql_type=sql_type,
+            foreign_include=foreign_include,
+            exclude_primary_key=NO_PRIMARY_KEY,
+        )
 
     foreign_table_mapping = {db_model.__tablename__: db_model}
     if foreign_include:
         for i in foreign_include:
-            model , _= convert_table_to_model(i)
+            model, _ = convert_table_to_model(i)
             foreign_table_mapping[model.__tablename__] = i
-    crud_service = query_service(model=db_model, async_mode=async_mode, foreign_table_mapping=foreign_table_mapping)
+    crud_service = query_service(
+        model=db_model,
+        async_mode=async_mode,
+        foreign_table_mapping=foreign_table_mapping,
+    )
     # else:
     #     crud_service = SQLAlchemyPostgreQueryService(model=db_model, async_mode=async_mode)
 
-    result_parser = result_parser_builder(async_model=async_mode,
-                                          crud_models=crud_models,
-                                          autocommit=autocommit)
+    result_parser = result_parser_builder(
+        async_model=async_mode, crud_models=crud_models, autocommit=autocommit
+    )
     methods_dependencies = crud_models.get_available_request_method()
     primary_name = crud_models.PRIMARY_KEY_NAME
     if primary_name:
-        path = '/{' + primary_name + '}'
+        path = "/{" + primary_name + "}"
     else:
         path = ""
     unique_list: List[str] = crud_models.UNIQUE_LIST
@@ -169,255 +182,301 @@ def crud_router_builder(
     execute_service = SQLALchemyExecuteService()
 
     def find_one_api(request_response_model: dict, dependencies):
-        _request_query_model = request_response_model.get('requestQueryModel', None)
-        _response_model = request_response_model.get('responseModel', None)
-        _request_url_param_model = request_response_model.get('requestUrlParamModel', None)
-        routes_source.find_one(path=path,
-                               request_url_param_model=_request_url_param_model,
-                               request_query_model=_request_query_model,
-                               response_model=_response_model,
-                               db_session=db_session,
-                               query_service=crud_service,
-                               parsing_service=result_parser,
-                               execute_service=execute_service,
-                               dependencies=dependencies,
-                               api=api,
-                               async_mode=async_mode)
+        _request_query_model = request_response_model.get("requestQueryModel", None)
+        _response_model = request_response_model.get("responseModel", None)
+        _request_url_param_model = request_response_model.get(
+            "requestUrlParamModel", None
+        )
+        routes_source.find_one(
+            path=path,
+            request_url_param_model=_request_url_param_model,
+            request_query_model=_request_query_model,
+            response_model=_response_model,
+            db_session=db_session,
+            query_service=crud_service,
+            parsing_service=result_parser,
+            execute_service=execute_service,
+            dependencies=dependencies,
+            api=api,
+            async_mode=async_mode,
+        )
 
     def find_many_api(request_response_model: dict, dependencies):
-        _request_query_model = request_response_model.get('requestQueryModel', None)
-        _response_model = request_response_model.get('responseModel', None)
-        routes_source.find_many(path="",
-                                request_query_model=_request_query_model,
-                                response_model=_response_model,
-                                db_session=db_session,
-                                query_service=crud_service,
-                                parsing_service=result_parser,
-                                execute_service=execute_service,
-                                dependencies=dependencies,
-                                api=api,
-                                async_mode=async_mode)
+        _request_query_model = request_response_model.get("requestQueryModel", None)
+        _response_model = request_response_model.get("responseModel", None)
+        routes_source.find_many(
+            path="",
+            request_query_model=_request_query_model,
+            response_model=_response_model,
+            db_session=db_session,
+            query_service=crud_service,
+            parsing_service=result_parser,
+            execute_service=execute_service,
+            dependencies=dependencies,
+            api=api,
+            async_mode=async_mode,
+        )
 
     def upsert_one_api(request_response_model: dict, dependencies):
-        _request_body_model = request_response_model.get('requestBodyModel', None)
-        _response_model = request_response_model.get('responseModel', None)
-        routes_source.upsert_one(path="",
-                                 request_body_model=_request_body_model,
-                                 response_model=_response_model,
-                                 db_session=db_session,
-                                 query_service=crud_service,
-                                 parsing_service=result_parser,
-                                 execute_service=execute_service,
-                                 dependencies=dependencies,
-                                 api=api,
-                                 async_mode=async_mode,
-                                 unique_list=unique_list)
+        _request_body_model = request_response_model.get("requestBodyModel", None)
+        _response_model = request_response_model.get("responseModel", None)
+        routes_source.upsert_one(
+            path="",
+            request_body_model=_request_body_model,
+            response_model=_response_model,
+            db_session=db_session,
+            query_service=crud_service,
+            parsing_service=result_parser,
+            execute_service=execute_service,
+            dependencies=dependencies,
+            api=api,
+            async_mode=async_mode,
+            unique_list=unique_list,
+        )
 
     def upsert_many_api(request_response_model: dict, dependencies):
-        _request_body_model = request_response_model.get('requestBodyModel', None)
-        _response_model = request_response_model.get('responseModel', None)
+        _request_body_model = request_response_model.get("requestBodyModel", None)
+        _response_model = request_response_model.get("responseModel", None)
 
-        routes_source.upsert_many(path="",
-                                  request_body_model=_request_body_model,
-                                  response_model=_response_model,
-                                  db_session=db_session,
-                                  query_service=crud_service,
-                                  parsing_service=result_parser,
-                                  execute_service=execute_service,
-                                  dependencies=dependencies,
-                                  api=api,
-                                  unique_list=unique_list,
-                                  async_mode=async_mode)
+        routes_source.upsert_many(
+            path="",
+            request_body_model=_request_body_model,
+            response_model=_response_model,
+            db_session=db_session,
+            query_service=crud_service,
+            parsing_service=result_parser,
+            execute_service=execute_service,
+            dependencies=dependencies,
+            api=api,
+            unique_list=unique_list,
+            async_mode=async_mode,
+        )
 
     def create_one_api(request_response_model: dict, dependencies):
-        _request_body_model = request_response_model.get('requestBodyModel', None)
-        _response_model = request_response_model.get('responseModel', None)
-        routes_source.create_one(path="",
-                                 request_body_model=_request_body_model,
-                                 response_model=_response_model,
-                                 db_session=db_session,
-                                 query_service=crud_service,
-                                 parsing_service=result_parser,
-                                 execute_service=execute_service,
-                                 dependencies=dependencies,
-                                 api=api,
-                                 async_mode=async_mode,
-                                 unique_list=unique_list)
+        _request_body_model = request_response_model.get("requestBodyModel", None)
+        _response_model = request_response_model.get("responseModel", None)
+        _request_body_variable_mapping = request_response_model.get(
+            "RequestBodyUrlVariableMapping", None
+        )
+        routes_source.create_one(
+            path="",
+            request_body_model=_request_body_model,
+            response_model=_response_model,
+            db_session=db_session,
+            query_service=crud_service,
+            parsing_service=result_parser,
+            execute_service=execute_service,
+            dependencies=dependencies,
+            api=api,
+            async_mode=async_mode,
+            unique_list=unique_list,
+            request_body_variable_mapping=_request_body_variable_mapping,
+        )
 
     def create_many_api(request_response_model: dict, dependencies):
-        _request_body_model = request_response_model.get('requestBodyModel', None)
-        _response_model = request_response_model.get('responseModel', None)
-
-        routes_source.create_many(path="",
-                                  request_body_model=_request_body_model,
-                                  response_model=_response_model,
-                                  db_session=db_session,
-                                  query_service=crud_service,
-                                  parsing_service=result_parser,
-                                  execute_service=execute_service,
-                                  dependencies=dependencies,
-                                  api=api,
-                                  unique_list=unique_list,
-                                  async_mode=async_mode)
+        _request_body_model = request_response_model.get("requestBodyModel", None)
+        _response_model = request_response_model.get("responseModel", None)
+        _request_body_variable_mapping = request_response_model.get(
+            "RequestBodyUrlVariableMapping", None
+        )
+        routes_source.create_many(
+            path="",
+            request_body_model=_request_body_model,
+            response_model=_response_model,
+            db_session=db_session,
+            query_service=crud_service,
+            parsing_service=result_parser,
+            execute_service=execute_service,
+            dependencies=dependencies,
+            api=api,
+            unique_list=unique_list,
+            async_mode=async_mode,
+            request_body_variable_mapping=_request_body_variable_mapping,
+        )
 
     def delete_one_api(request_response_model: dict, dependencies):
-        _request_query_model = request_response_model.get('requestQueryModel', None)
-        _request_url_model = request_response_model.get('requestUrlParamModel', None)
-        _response_model = request_response_model.get('responseModel', None)
+        _request_query_model = request_response_model.get("requestQueryModel", None)
+        _request_url_model = request_response_model.get("requestUrlParamModel", None)
+        _response_model = request_response_model.get("responseModel", None)
 
-        routes_source.delete_one(path=path,
-                                 request_query_model=_request_query_model,
-                                 request_url_model=_request_url_model,
-                                 response_model=_response_model,
-                                 db_session=db_session,
-                                 query_service=crud_service,
-                                 parsing_service=result_parser,
-                                 execute_service=execute_service,
-                                 dependencies=dependencies,
-                                 api=api,
-                                 async_mode=async_mode)
+        routes_source.delete_one(
+            path=path,
+            request_query_model=_request_query_model,
+            request_url_model=_request_url_model,
+            response_model=_response_model,
+            db_session=db_session,
+            query_service=crud_service,
+            parsing_service=result_parser,
+            execute_service=execute_service,
+            dependencies=dependencies,
+            api=api,
+            async_mode=async_mode,
+        )
 
     def delete_many_api(request_response_model: dict, dependencies):
-        _request_query_model = request_response_model.get('requestQueryModel', None)
-        _response_model = request_response_model.get('responseModel', None)
+        _request_query_model = request_response_model.get("requestQueryModel", None)
+        _response_model = request_response_model.get("responseModel", None)
 
-        routes_source.delete_many(path="",
-                                  request_query_model=_request_query_model,
-                                  response_model=_response_model,
-                                  db_session=db_session,
-                                  query_service=crud_service,
-                                  parsing_service=result_parser,
-                                  execute_service=execute_service,
-                                  dependencies=dependencies,
-                                  api=api,
-                                  async_mode=async_mode)
+        routes_source.delete_many(
+            path="",
+            request_query_model=_request_query_model,
+            response_model=_response_model,
+            db_session=db_session,
+            query_service=crud_service,
+            parsing_service=result_parser,
+            execute_service=execute_service,
+            dependencies=dependencies,
+            api=api,
+            async_mode=async_mode,
+        )
 
     def post_redirect_get_api(request_response_model: dict, dependencies):
-        _request_body_model = request_response_model.get('requestBodyModel', None)
-        _response_model = request_response_model.get('responseModel', None)
-
-        routes_source.post_redirect_get(api=api,
-                                        dependencies=dependencies,
-                                        request_body_model=_request_body_model,
-                                        db_session=db_session,
-                                        crud_service=crud_service,
-                                        result_parser=result_parser,
-                                        execute_service=execute_service,
-                                        async_mode=async_mode,
-                                        response_model=_response_model)
+        _request_body_model = request_response_model.get("requestBodyModel", None)
+        _response_model = request_response_model.get("responseModel", None)
+        _request_body_variable_mapping = request_response_model.get(
+            "RequestBodyUrlVariableMapping", None
+        )
+        routes_source.post_redirect_get(
+            api=api,
+            dependencies=dependencies,
+            request_body_model=_request_body_model,
+            db_session=db_session,
+            crud_service=crud_service,
+            result_parser=result_parser,
+            execute_service=execute_service,
+            async_mode=async_mode,
+            response_model=_response_model,
+            request_body_variable_mapping=_request_body_variable_mapping,
+        )
 
     def patch_one_api(request_response_model: dict, dependencies):
-        _request_query_model = request_response_model.get('requestQueryModel', None)
-        _response_model = request_response_model.get('responseModel', None)
-        _request_body_model = request_response_model.get('requestBodyModel', None)
-        _request_url_param_model = request_response_model.get('requestUrlParamModel', None)
+        _request_query_model = request_response_model.get("requestQueryModel", None)
+        _response_model = request_response_model.get("responseModel", None)
+        _request_body_model = request_response_model.get("requestBodyModel", None)
+        _request_url_param_model = request_response_model.get(
+            "requestUrlParamModel", None
+        )
 
-        routes_source.patch_one(api=api,
-                                path=path,
-                                request_url_param_model=_request_url_param_model,
-                                request_query_model=_request_query_model,
-                                dependencies=dependencies,
-                                request_body_model=_request_body_model,
-                                db_session=db_session,
-                                crud_service=crud_service,
-                                result_parser=result_parser,
-                                execute_service=execute_service,
-                                async_mode=async_mode,
-                                response_model=_response_model)
+        routes_source.patch_one(
+            api=api,
+            path=path,
+            request_url_param_model=_request_url_param_model,
+            request_query_model=_request_query_model,
+            dependencies=dependencies,
+            request_body_model=_request_body_model,
+            db_session=db_session,
+            crud_service=crud_service,
+            result_parser=result_parser,
+            execute_service=execute_service,
+            async_mode=async_mode,
+            response_model=_response_model,
+        )
 
     def patch_many_api(request_response_model: dict, dependencies):
-        _request_query_model = request_response_model.get('requestQueryModel', None)
-        _response_model = request_response_model.get('responseModel', None)
-        _request_body_model = request_response_model.get('requestBodyModel', None)
+        _request_query_model = request_response_model.get("requestQueryModel", None)
+        _response_model = request_response_model.get("responseModel", None)
+        _request_body_model = request_response_model.get("requestBodyModel", None)
 
-        routes_source.patch_many(api=api,
-                                 path="",
-                                 request_query_model=_request_query_model,
-                                 dependencies=dependencies,
-                                 request_body_model=_request_body_model,
-                                 db_session=db_session,
-                                 crud_service=crud_service,
-                                 result_parser=result_parser,
-                                 execute_service=execute_service,
-                                 async_mode=async_mode,
-                                 response_model=_response_model)
+        routes_source.patch_many(
+            api=api,
+            path="",
+            request_query_model=_request_query_model,
+            dependencies=dependencies,
+            request_body_model=_request_body_model,
+            db_session=db_session,
+            crud_service=crud_service,
+            result_parser=result_parser,
+            execute_service=execute_service,
+            async_mode=async_mode,
+            response_model=_response_model,
+        )
 
     def put_one_api(request_response_model: dict, dependencies):
-        _request_query_model = request_response_model.get('requestQueryModel', None)
-        _response_model = request_response_model.get('responseModel', None)
-        _request_body_model = request_response_model.get('requestBodyModel', None)
-        _request_url_param_model = request_response_model.get('requestUrlParamModel', None)
-        routes_source.put_one(api=api,
-                              path=path,
-                              request_query_model=_request_query_model,
-                              dependencies=dependencies,
-                              request_body_model=_request_body_model,
-                              db_session=db_session,
-                              crud_service=crud_service,
-                              result_parser=result_parser,
-                              execute_service=execute_service,
-                              async_mode=async_mode,
-                              response_model=_response_model,
-                              request_url_param_model=_request_url_param_model)
+        _request_query_model = request_response_model.get("requestQueryModel", None)
+        _response_model = request_response_model.get("responseModel", None)
+        _request_body_model = request_response_model.get("requestBodyModel", None)
+        _request_url_param_model = request_response_model.get(
+            "requestUrlParamModel", None
+        )
+        routes_source.put_one(
+            api=api,
+            path=path,
+            request_query_model=_request_query_model,
+            dependencies=dependencies,
+            request_body_model=_request_body_model,
+            db_session=db_session,
+            crud_service=crud_service,
+            result_parser=result_parser,
+            execute_service=execute_service,
+            async_mode=async_mode,
+            response_model=_response_model,
+            request_url_param_model=_request_url_param_model,
+        )
 
     def put_many_api(request_response_model: dict, dependencies):
-        _request_query_model = request_response_model.get('requestQueryModel', None)
-        _response_model = request_response_model.get('responseModel', None)
-        _request_body_model = request_response_model.get('requestBodyModel', None)
+        _request_query_model = request_response_model.get("requestQueryModel", None)
+        _response_model = request_response_model.get("responseModel", None)
+        _request_body_model = request_response_model.get("requestBodyModel", None)
 
-        routes_source.put_many(api=api,
-                               path='',
-                               request_query_model=_request_query_model,
-                               dependencies=dependencies,
-                               request_body_model=_request_body_model,
-                               db_session=db_session,
-                               crud_service=crud_service,
-                               result_parser=result_parser,
-                               execute_service=execute_service,
-                               async_mode=async_mode,
-                               response_model=_response_model)
+        routes_source.put_many(
+            api=api,
+            path="",
+            request_query_model=_request_query_model,
+            dependencies=dependencies,
+            request_body_model=_request_body_model,
+            db_session=db_session,
+            crud_service=crud_service,
+            result_parser=result_parser,
+            execute_service=execute_service,
+            async_mode=async_mode,
+            response_model=_response_model,
+        )
 
     def find_one_foreign_tree_api(request_response_model: dict, dependencies):
-        _foreign_list_model = request_response_model.get('foreignListModel', None)
+        _foreign_list_model = request_response_model.get("foreignListModel", None)
         for i in _foreign_list_model:
             _request_query_model = i["request_query_model"]
             _response_model = i["response_model"]
             _path = i["path"]
             _function_name = i["function_name"]
             request_url_param_model = i["primary_key_dataclass_model"]
-            routes_source.find_one_foreign_tree(path=_path,
-                                                request_query_model=_request_query_model,
-                                                response_model=_response_model,
-                                                request_url_param_model=request_url_param_model,
-                                                db_session=db_session,
-                                                query_service=crud_service,
-                                                parsing_service=result_parser,
-                                                execute_service=execute_service,
-                                                dependencies=dependencies,
-                                                api=api,
-                                                function_name=_function_name,
-                                                async_mode=async_mode)
+            routes_source.find_one_foreign_tree(
+                path=_path,
+                request_query_model=_request_query_model,
+                response_model=_response_model,
+                request_url_param_model=request_url_param_model,
+                db_session=db_session,
+                query_service=crud_service,
+                parsing_service=result_parser,
+                execute_service=execute_service,
+                dependencies=dependencies,
+                api=api,
+                function_name=_function_name,
+                async_mode=async_mode,
+            )
 
     def find_many_foreign_tree_api(request_response_model: dict, dependencies):
-        _foreign_list_model = request_response_model.get('foreignListModel', None)
+        _foreign_list_model = request_response_model.get("foreignListModel", None)
         for i in _foreign_list_model:
             _request_query_model = i["request_query_model"]
             _response_model = i["response_model"]
             _path = i["path"]
             _function_name = i["function_name"]
             request_url_param_model = i["primary_key_dataclass_model"]
-            routes_source.find_many_foreign_tree(path=_path,
-                                                 request_query_model=_request_query_model,
-                                                 response_model=_response_model,
-                                                 request_url_param_model=request_url_param_model,
-                                                 db_session=db_session,
-                                                 query_service=crud_service,
-                                                 parsing_service=result_parser,
-                                                 execute_service=execute_service,
-                                                 dependencies=dependencies,
-                                                 api=api,
-                                                 async_mode=async_mode,
-                                                 function_name=_function_name)
+            routes_source.find_many_foreign_tree(
+                path=_path,
+                request_query_model=_request_query_model,
+                response_model=_response_model,
+                request_url_param_model=request_url_param_model,
+                db_session=db_session,
+                query_service=crud_service,
+                parsing_service=result_parser,
+                execute_service=execute_service,
+                dependencies=dependencies,
+                api=api,
+                async_mode=async_mode,
+                function_name=_function_name,
+            )
 
     api_register = {
         CrudMethods.FIND_ONE.value: find_one_api,
@@ -434,7 +493,7 @@ def crud_router_builder(
         CrudMethods.UPDATE_ONE.value: put_one_api,
         CrudMethods.UPDATE_MANY.value: put_many_api,
         CrudMethods.FIND_ONE_WITH_FOREIGN_TREE.value: find_one_foreign_tree_api,
-        CrudMethods.FIND_MANY_WITH_FOREIGN_TREE.value: find_many_foreign_tree_api
+        CrudMethods.FIND_MANY_WITH_FOREIGN_TREE.value: find_many_foreign_tree_api,
     }
     api = APIRouter(**router_kwargs)
 
@@ -442,12 +501,17 @@ def crud_router_builder(
         dependencies = []
     dependencies = [Depends(dep) for dep in dependencies]
     for request_method in methods_dependencies:
-        value_of_dict_crud_model = crud_models.get_model_by_request_method(request_method)
+        value_of_dict_crud_model = crud_models.get_model_by_request_method(
+            request_method
+        )
         crud_model_of_this_request_methods = value_of_dict_crud_model.keys()
         for crud_model_of_this_request_method in crud_model_of_this_request_methods:
-            request_response_model_of_this_request_method = value_of_dict_crud_model[crud_model_of_this_request_method]
-            api_register[crud_model_of_this_request_method.value](request_response_model_of_this_request_method,
-                                                                  dependencies)
+            request_response_model_of_this_request_method = value_of_dict_crud_model[
+                crud_model_of_this_request_method
+            ]
+            api_register[crud_model_of_this_request_method.value](
+                request_response_model_of_this_request_method, dependencies
+            )
 
     return api
 
