@@ -396,7 +396,7 @@ class SQLAlchemyGeneralSQLeResultParse(object):
     ):
         session = kwargs.get("session")
         if sql_execute_result:
-            self.delete(session, sql_execute_result)
+            await self.async_delete(session, sql_execute_result)
         result = self.delete_one_sub_func(
             response_model, sql_execute_result, fastapi_response, **kwargs
         )
