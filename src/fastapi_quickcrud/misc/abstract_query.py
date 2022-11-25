@@ -38,8 +38,6 @@ class SQLAlchemyGeneralSQLQueryService(ABC):
         if target_model:
             model = self.foreign_table_mapping[target_model]
 
-        self.foreign_table_mapping[target_model]
-
         primary_join = None
         for c in inspect(self.model).relationships:
             for remote_pair in c.local_remote_pairs:
@@ -58,11 +56,17 @@ class SQLAlchemyGeneralSQLQueryService(ABC):
         if not isinstance(self.model, Table):
             model = model.__table__
 
-        stmt = (
-            select(*[model] + join_table_instance_list)
-            .join(self.model, primary_join)
-            .where(and_(*filter_list + path_filter_list))
-        )
+        if len(self.foreign_table_mapping) > 1:
+            stmt = (
+                select(*[model] + join_table_instance_list)
+                .join(self.model, primary_join)
+                .where(and_(*filter_list + path_filter_list))
+            )
+        else:
+            stmt = select(*[model] + join_table_instance_list).where(
+                and_(*filter_list + path_filter_list)
+            )
+
         if order_by_columns:
             order_by_query_list = []
 

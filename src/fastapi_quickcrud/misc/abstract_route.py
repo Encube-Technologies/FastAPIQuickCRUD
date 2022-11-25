@@ -20,8 +20,10 @@ def request_body_variable_mapper(
         if create_one:
             query[key] = eval_value
         else:
-            for index, single_query_part in enumerate(query):
-                query[index][key] = eval_value
+            if type(query) == list:
+                for index, single_query_part in enumerate(query):
+                    query[index][key] = eval_value
+
     return query
 
 
@@ -124,6 +126,7 @@ class SQLAlchemyGeneralSQLBaseRouteSource(ABC):
         dependencies,
         request_query_model,
         db_session,
+        request_body_variable_mapping,
     ):
         if async_mode:
 
@@ -135,7 +138,11 @@ class SQLAlchemyGeneralSQLBaseRouteSource(ABC):
                 session=Depends(db_session),
             ):
                 join = query.__dict__.pop("join_foreign_table", None)
-                stmt = query_service.get_many(query=query.__dict__, join_mode=join)
+
+                query_dict = request_body_variable_mapper(
+                    query.__dict__, request_body_variable_mapping, locals()
+                )
+                stmt = query_service.get_many(query=query_dict, join_mode=join)
 
                 query_result = await execute_service.async_execute(session, stmt)
 
@@ -158,8 +165,10 @@ class SQLAlchemyGeneralSQLBaseRouteSource(ABC):
                 session=Depends(db_session),
             ):
                 join = query.__dict__.pop("join_foreign_table", None)
-
-                stmt = query_service.get_many(query=query.__dict__, join_mode=join)
+                query_dict = request_body_variable_mapper(
+                    query.__dict__, request_body_variable_mapping, locals()
+                )
+                stmt = query_service.get_many(query=query_dict, join_mode=join)
                 query_result = execute_service.execute(session, stmt)
                 parsed_response = parsing_service.find_many(
                     response_model=response_model,

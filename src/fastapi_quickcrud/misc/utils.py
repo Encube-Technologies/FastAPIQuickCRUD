@@ -82,7 +82,21 @@ def find_query_builder(param: dict, model: Base) -> List[Union[BinaryExpression]
         elif ExtraFieldTypePrefix.Str in column_name:
             type_ = ExtraFieldTypePrefix.Str
         else:
-            query.append((getattr(model, column_name) == value))
+            # fix for table__field values to unify values in swagger
+            # for table project primary key id and FOREIGN_PATH_PARAM_KEYWORD == "__" will primary key look
+            # column_name = "project__id"
+            table_name_from_param = column_name.split(FOREIGN_PATH_PARAM_KEYWORD)[0]
+            if table_name_from_param == model.__tablename__:
+                query.append(
+                    (
+                        getattr(
+                            model, column_name.split(FOREIGN_PATH_PARAM_KEYWORD)[-1]
+                        )
+                        == value
+                    )
+                )
+            else:
+                query.append((getattr(model, column_name) == value))
             # raise Exception('known error')
             continue
         sub_query = []
@@ -251,6 +265,7 @@ def sqlalchemy_to_pydantic(
                 request_body_model,
                 response_model,
             ) = model_builder.find_many(
+                exclude_columns_request,
                 exclude_columns_response,
             )
         elif crud_method.value == CrudMethods.POST_REDIRECT_GET.value:

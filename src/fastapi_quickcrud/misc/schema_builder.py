@@ -30,7 +30,7 @@ from .type import (
     SqlType,
 )
 
-FOREIGN_PATH_PARAM_KEYWORD = "__pk__"
+FOREIGN_PATH_PARAM_KEYWORD = "__"
 BaseModelT = TypeVar("BaseModelT", bound=BaseModel)
 DataClassT = TypeVar("DataClassT", bound=Any)
 DeclarativeClassT = NewType("DeclarativeClassT", declarative_base)
@@ -295,7 +295,11 @@ class ApiParameterSchemaBuilder:
                 f"and it is not nullable and in exclude_list"
                 f"it may throw error when you insert data "
             )
-        primary_column_name = str(primary_key_column.key)
+        primary_column_name = (
+            str(db_model_table.name)
+            + FOREIGN_PATH_PARAM_KEYWORD
+            + str(primary_key_column.key)
+        )
         primary_field_definitions = (primary_column_name, column_type, default)
 
         primary_columns_model: DataClassT = make_dataclass(
@@ -1286,13 +1290,19 @@ class ApiParameterSchemaBuilder:
 
         return None, request_body_model, response_model
 
-    def find_many(self, exclude_columns_response) -> Tuple:
+    def find_many(self, exclude_columns_request, exclude_columns_response) -> Tuple:
         query_param: List[dict] = self._get_fizzy_query_param()
-        query_param: List[Tuple] = self._assign_pagination_param(query_param)
-        query_param: List[Union[Tuple, Dict]] = self._assign_foreign_join(query_param)
 
         response_fields = []
         all_field = deepcopy(self.all_field)
+
+        # possibility to filter by fields
+        for i in all_field:
+            if i["column_name"] not in exclude_columns_request:
+                query_param.append((i["column_name"], i["column_type"], None))
+
+        query_param: List[Tuple] = self._assign_pagination_param(query_param)
+        query_param: List[Union[Tuple, Dict]] = self._assign_foreign_join(query_param)
         for local_column, refer_table_info in self.reference_mapper.items():
             response_fields.append(
                 (
@@ -2006,7 +2016,9 @@ class ApiParameterSchemaBuilder:
 
         return None, request_query_model, request_body_model, response_model
 
-    def post_redirect_get(self, exclude_columns_request, exclude_columns_response) -> Tuple:
+    def post_redirect_get(
+        self, exclude_columns_request, exclude_columns_response
+    ) -> Tuple:
         request_validation = [lambda self_object: _filter_none(self_object)]
         request_body_fields = []
         response_body_fields = []
@@ -2063,13 +2075,7 @@ class ApiParameterSchemaBuilder:
     def foreign_tree_get_many(self, exclude_columns_response) -> Tuple:
         _tmp = []
         path = ""
-        path += (
-            "/{"
-            + self.db_name
-            + FOREIGN_PATH_PARAM_KEYWORD
-            + self.primary_key_str
-            + "}"
-        )
+        path += "/{" + self.primary_key_str + "}"
         path_model = [self.__db_model_table]
         pk_list = [self.db_name + "." + self.primary_key_str]
         total_table_of_foreign = {}
@@ -2190,13 +2196,7 @@ class ApiParameterSchemaBuilder:
     def foreign_tree_get_one(self, exclude_columns_response) -> Tuple:
         _tmp = []
         path = ""
-        path += (
-            "/{"
-            + self.db_name
-            + FOREIGN_PATH_PARAM_KEYWORD
-            + self.primary_key_str
-            + "}"
-        )
+        path += "/{" + self.primary_key_str + "}"
         path_model = [self.__db_model_table]
         pk_list = [self.db_name + "." + self.primary_key_str]
         total_table_of_foreign = {}
@@ -2223,7 +2223,7 @@ class ApiParameterSchemaBuilder:
             all_field = deepcopy(_all_fields)
 
             path += "/" + _db_name + ""
-            path += "/{" + _db_name + FOREIGN_PATH_PARAM_KEYWORD + _primary_key[0] + "}"
+            path += "/{" + _primary_key[0] + "}"
             function_name += "_/_" + _db_name
 
             pk_list.append(_db_name + "." + _primary_key[0])

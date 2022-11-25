@@ -204,6 +204,9 @@ def crud_router_builder(
     def find_many_api(request_response_model: dict, dependencies):
         _request_query_model = request_response_model.get("requestQueryModel", None)
         _response_model = request_response_model.get("responseModel", None)
+        _request_body_variable_mapping = request_response_model.get(
+            "RequestBodyUrlVariableMapping", None
+        )
         routes_source.find_many(
             path="",
             request_query_model=_request_query_model,
@@ -215,6 +218,7 @@ def crud_router_builder(
             dependencies=dependencies,
             api=api,
             async_mode=async_mode,
+            request_body_variable_mapping=_request_body_variable_mapping,
         )
 
     def upsert_one_api(request_response_model: dict, dependencies):

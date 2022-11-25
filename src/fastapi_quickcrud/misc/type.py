@@ -14,6 +14,7 @@ class SqlType(StrEnum):
     oracle = auto()
     mssql = auto()
 
+
 class Ordering(StrEnum):
     DESC = auto()
     ASC = auto()
@@ -38,16 +39,29 @@ class CrudMethods(Enum):
 
     @staticmethod
     def get_table_full_crud_method():
-        return [CrudMethods.FIND_MANY, CrudMethods.CREATE_MANY, CrudMethods.UPDATE_MANY, CrudMethods.PATCH_MANY,
-                CrudMethods.DELETE_MANY]
+        return [
+            CrudMethods.FIND_MANY,
+            CrudMethods.CREATE_MANY,
+            CrudMethods.UPDATE_MANY,
+            CrudMethods.PATCH_MANY,
+            CrudMethods.DELETE_MANY,
+        ]
 
     @staticmethod
     def get_declarative_model_full_crud_method():
-        return [CrudMethods.FIND_MANY, CrudMethods.FIND_ONE,
-                CrudMethods.UPDATE_MANY, CrudMethods.UPDATE_ONE,
-                CrudMethods.PATCH_MANY, CrudMethods.PATCH_ONE, CrudMethods.CREATE_MANY,
-                 CrudMethods.DELETE_MANY, CrudMethods.DELETE_ONE, CrudMethods.FIND_ONE_WITH_FOREIGN_TREE,
-                 CrudMethods.FIND_MANY_WITH_FOREIGN_TREE]
+        return [
+            CrudMethods.FIND_MANY,
+            CrudMethods.FIND_ONE,
+            CrudMethods.UPDATE_MANY,
+            CrudMethods.UPDATE_ONE,
+            CrudMethods.PATCH_MANY,
+            CrudMethods.PATCH_ONE,
+            CrudMethods.CREATE_MANY,
+            CrudMethods.DELETE_MANY,
+            CrudMethods.DELETE_ONE,
+            CrudMethods.FIND_ONE_WITH_FOREIGN_TREE,
+            CrudMethods.FIND_MANY_WITH_FOREIGN_TREE,
+        ]
 
 
 class RequestMethods(Enum):
@@ -88,20 +102,21 @@ class CRUDRequestMapping(Enum):
         crud_methods = cls.__dict__
         if value not in crud_methods:
             raise InvalidRequestMethod(
-                f'{value} is not an available request method, Please use CrudMethods to select available crud method')
+                f"{value} is not an available request method, Please use CrudMethods to select available crud method"
+            )
         return crud_methods[value].value
 
 
 class ExtraFieldType(StrEnum):
-    Comparison_operator = '_____comparison_operator'
-    Matching_pattern = '_____matching_pattern'
+    Comparison_operator = "_____comparison_operator"
+    Matching_pattern = "_____matching_pattern"
 
 
 class ExtraFieldTypePrefix(StrEnum):
-    List = '____list'
-    From = '____from'
-    To = '____to'
-    Str = '____str'
+    List = "____list"
+    From = "____from"
+    To = "____to"
+    Str = "____str"
 
 
 class RangeFromComparisonOperators(StrEnum):
@@ -138,25 +153,30 @@ class PGSQLMatchingPattern(StrEnum):
     not_similar_to = auto()
 
 
-PGSQLMatchingPatternInString = StrEnum('PGSQLMatchingPatternInString',
-                                       {Pattern: auto() for Pattern in
-                                        chain(MatchingPatternInStringBase, PGSQLMatchingPattern)})
+PGSQLMatchingPatternInString = StrEnum(
+    "PGSQLMatchingPatternInString",
+    {
+        Pattern: auto()
+        for Pattern in chain(MatchingPatternInStringBase, PGSQLMatchingPattern)
+    },
+)
 
 
 class JSONMatchingMode(str, Enum):
-    match_the_key_value = 'match_the_key_value'
-    match_the_value_if_not_null_by_key = 'match_the_value_if_not_null_by_key'
-    custom_query = 'custom_query'
+    match_the_key_value = "match_the_key_value"
+    match_the_value_if_not_null_by_key = "match_the_value_if_not_null_by_key"
+    custom_query = "custom_query"
 
 
 class JSONBMatchingMode(str, Enum):
-    match_the_key_value = 'match_the_key_value'
-    match_the_value_if_not_null_by_key = 'match_the_value_if_not_null_by_key'
-    custom_query = 'custom_query'
+    match_the_key_value = "match_the_key_value"
+    match_the_value_if_not_null_by_key = "match_the_value_if_not_null_by_key"
+    custom_query = "custom_query"
 
 
 class SessionObject(StrEnum):
     sqlalchemy = auto()
     databases = auto()
 
-FOREIGN_PATH_PARAM_KEYWORD = "__pk__"
+
+FOREIGN_PATH_PARAM_KEYWORD = "__"
