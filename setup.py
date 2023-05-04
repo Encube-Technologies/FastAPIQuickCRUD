@@ -23,7 +23,7 @@ if __name__ == "__main__":
         install_requires=[
             "fastapi<=0.86.0",
             "pydantic<=1.10.2",
-            "SQLAlchemy<=1.4.43",
+            "SQLAlchemy<=1.4.46",
             "StrEnum==0.4.7",
             "starlette==0.20.4",
             "aiosqlite==0.17.0",
